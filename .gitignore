@@ -1,0 +1,6 @@
+node_modules/
+lib/
+dist/
+.history
+.tags*
+yarn-error.log
