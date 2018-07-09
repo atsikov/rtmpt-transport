@@ -1,12 +1,12 @@
 import * as AMF from "../vendor/amfjs/amf-js";
 
 export class AmfObject extends AMF.Serializable {
-    constructor(data: object) {
+    constructor(data: any) {
         super("amf_object");
         this.writeKeys(data);
     }
 
-    private writeKeys(data: object, dest: any = this) {
+    private writeKeys(data: any, dest: any = this) {
         const keys = Object.keys(data);
         keys.forEach(key => {
             const value = data[key];

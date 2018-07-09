@@ -4,3 +4,4 @@ dist/
 .history
 .tags*
 yarn-error.log
+.vscode/settings.json

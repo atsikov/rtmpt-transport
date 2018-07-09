@@ -1,33 +1,32 @@
-import RtmptUrlBuilder from "./RtmptUrlBuilder"
-import RtmptMethod from "../consts/RtmptMethod";
+import { RtmptUrlBuilder } from "./RtmptUrlBuilder"
+import { RtmptMethod } from "../consts";
 
-class RtmptXhrLoader {
+export class RtmptXhrLoader {
+    private method: string;
+    private request: XMLHttpRequest;
+    private payload: Uint8Array | undefined;
 
-    constructor(
-        host,
-        method,
-        payload = null
-    ) {
-        this._method = method;
+    constructor(host: string, method: RtmptMethod, payload?: Uint8Array) {
+        this.method = method;
+        this.payload = payload;
 
-        let req = new XMLHttpRequest();
+        const req = new XMLHttpRequest();
         req.open("POST", RtmptUrlBuilder.getRequestUrl(host, method));
         req.responseType = "arraybuffer";
         req.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
 
-        this._request = req;
-        this._payload = payload;
+        this.request = req;
     }
 
     send() {
-        return new Promise(
+        return new Promise<Uint8Array>(
             (resolve, reject) => {
-                this._request.onload = (evt) => {
-                    let response = this._request.response;
+                this.request.onload = (event) => {
+                    const response = this.request.response;
                     if (response) {
-                        let bytes = new Uint8Array(response);
-                        if (this._method === RtmptMethod.OPEN) {
-                            let sessionId = bytes.reduce((sid, byte) => {
+                        const bytes = new Uint8Array(response);
+                        if (this.method === RtmptMethod.OPEN) {
+                            const sessionId = bytes.reduce((sid, byte) => {
                                 if (byte !== 10 && byte !== 13) {
                                     sid += String.fromCharCode(byte);
                                 }
@@ -41,13 +40,11 @@ class RtmptXhrLoader {
                         resolve(new Uint8Array(bytes));
                     }
                 };
-                this._request.onerror = (evt) => {
+                this.request.onerror = (evt) => {
                     reject(evt);
                 }
-                this._request.send(this._payload);
+                this.request.send(this.payload);
             }
         );
     }
 }
-
-export default RtmptXhrLoader;

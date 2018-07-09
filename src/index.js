@@ -1,26 +1,21 @@
-import RtmptXhrLoader from "./loader/RtmptXhrLoader";
+import { RtmptXhrLoader } from "./loader/RtmptXhrLoader";
 import { ByteArray, Endian } from "./utils/ByteArray";
-import ChunkComposer from "./controller/ChunkComposer";
-import ConnectCommand from "./controller/commands/ConnectCommand";
-import RtmptMethod from "./consts/RtmptMethod";
-import RtmpParser from "./controller/RtmpParser";
+import { createRtmpChunk } from "./controller/ChunkComposer";
+import { ConnectCommand } from "./controller/commands/ConnectCommand";
+import { RtmptMethod } from "./consts";
+import { parseRtmpChunk } from "./controller/RtmpParser";
 
 window.ByteArray = ByteArray;
 
-const request = new XMLHttpRequest();
-request.responseType = "arraybuffer";
-request.onload = event => {
-    console.log(new Uint8Array(request.response).slice(1536));
-    // RtmpParser.parse(
-    //     new ByteArray(
-    //         new Uint8Array(request.response).slice(1536)
-    //     )
-    // );
-}
-request.open("GET", "../refs/1.rtmp");
-request.send();
-
 let sessionId = "";
+
+// const xhr = new XMLHttpRequest();
+// xhr.responseType = "arraybuffer";
+// xhr.onload = event => parseRtmpChunk(xhr.response.slice(0));
+// xhr.open("GET", "../3.rtmp");
+// xhr.send();
+
+// throw("stop");
 
 const host = "https://fra1-wowza-e10.egcdn.video";
 // const host = "http://localhost:8008";
@@ -59,7 +54,7 @@ const makeAckRequest = () => {
     }
     payload.writeBytes(randomBytes);
     console.log(payload.length);
-    new RtmptXhrLoader(host, "send", payload.bytes).send().then(onAckComplete);
+    new RtmptXhrLoader(host, "send", payload.getBytes()).send().then(onAckComplete);
 }
 
 const onAckComplete = (data) => {
@@ -74,7 +69,7 @@ const makeHandshakeRequest = () => {
     let payload = new ByteArray();
     payload.writeBytes(challenge);
 
-    let connectChunk = ChunkComposer.buildChunk(
+    let connectChunk = createRtmpChunk(
         "connect",
         new ConnectCommand(
             "fra1-wowza-e10.egcdn.video",
@@ -85,19 +80,57 @@ const makeHandshakeRequest = () => {
     connectChunk.position = 0;
     console.log(connectChunk._buffer);
     console.log("=== connect chunk ===");
-    RtmpParser.parse(connectChunk);
+    parseRtmpChunk(connectChunk);
     console.log("=== end of connect chunk ===");
     payload.writeBytes(connectChunk);
 
     new RtmptXhrLoader(
-        host, "send", payload.bytes
+        host, "send", payload.getBytes()
     ).send().then(onHandshakeComplete);
 }
 
 const onHandshakeComplete = (data) => {
     console.log(`handshake response length: ${data.length}`);
     console.log(data);
-    RtmpParser.parse(new ByteArray(data.slice(1)));
+    parseRtmpChunk(new ByteArray(data.slice(1)));
+
+    createStream();
 };
+
+const createStream = () => {
+    let createStreamChunk = createRtmpChunk(
+        "createStream",
+        null
+    );
+
+    new RtmptXhrLoader(
+        host, "send", createStreamChunk.getBytes()
+    ).send().then(onStreamCreated);
+}
+
+const onStreamCreated = (data) => {
+    console.log(`createStream response length: ${data.length}`);
+    console.log(data);
+    parseRtmpChunk(new ByteArray(data.slice(1)));
+
+    let playChunk = createRtmpChunk(
+        "play",
+        null,
+        "immersive_auto",
+    );
+    new RtmptXhrLoader(
+        host, "send", playChunk.getBytes()
+    ).send().then(onPlayStarted);
+}
+
+const onPlayStarted = (data) => {
+    console.log(`createStream response length: ${data.length}`);
+    console.log(data);
+    parseRtmpChunk(new ByteArray(data.slice(1)));
+
+    setTimeout(() => new RtmptXhrLoader(
+        host, "idle", nullBytePayload
+    ).send().then(videoData => parseRtmpChunk(new ByteArray(videoData.slice(1)))), 500);
+}
 
 new RtmptXhrLoader(host, "open", nullBytePayload).send().then(onSessionIdReady);

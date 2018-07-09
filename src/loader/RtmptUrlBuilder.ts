@@ -1,21 +1,19 @@
-import RtmptMethod from "../consts/RtmptMethod";
+import { RtmptMethod } from "../consts";
 
-let sessionId = null;
+let sessionId: string | undefined;
 let requestId = 0;
 
-const RtmptUrlBuilder = {
+export const RtmptUrlBuilder = {
     increaseRequestId() {
         requestId++;
     },
-    setSessionId(value) {
+    setSessionId(value: string) {
         sessionId = value;
         requestId = 0;
     },
-    getRequestUrl(host, method) {
+    getRequestUrl(host: string, method: RtmptMethod) {
         let urlSessionId = sessionId ? `${sessionId}/` : "";
         let urlRequestId = method === RtmptMethod.OPEN ? 1 : requestId;
         return `${host}/${method}/${urlSessionId}${urlRequestId}`;
     },
 }
-
-export default RtmptUrlBuilder;
