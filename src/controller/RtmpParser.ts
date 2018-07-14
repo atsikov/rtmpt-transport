@@ -8,10 +8,15 @@ import { RtmpChunkHeader, RtmpChunk, RtmpMessageHeader } from "../interface/Rtmp
 
 let chunkList: { [key: number]: RtmpChunk } = {};
 
-const parseBasicHeader = (bytes: ByteArray): RtmpChunkHeader => {
+function parseBasicHeader(bytes: ByteArray): RtmpChunkHeader {
     let firstByte = bytes.readUnsignedByte();
     let type = firstByte >> 6;
     let streamId = firstByte & 0x3F;
+
+    console.log(`first byte: 0x${firstByte.toString(16)}`);
+    console.log(`header type: ${type}`);
+    console.log(`stream id: ${streamId}`);
+
     let headerSize;
     switch (streamId) {
         case 0: {
@@ -39,9 +44,16 @@ const parseBasicHeader = (bytes: ByteArray): RtmpChunkHeader => {
     return chunkHeader;
 };
 
-const parseMessageHeader = (bytes: ByteArray, chunkData: RtmpChunk): RtmpMessageHeader => {
+function parseMessageHeader(bytes: ByteArray, chunkData: RtmpChunk): RtmpMessageHeader {
     const chunkHeader = chunkData.chunkHeader;
-    const messageHeader = chunkData.messageHeader || {};
+    const messageHeader =
+        chunkData.messageHeader ||
+        {
+            length: 0,
+            type: 0,
+            streamId: 0,
+            timestamp: 0,
+        };
 
     if (chunkHeader.type == 3) {
         return messageHeader;
@@ -67,7 +79,7 @@ const parseMessageHeader = (bytes: ByteArray, chunkData: RtmpChunk): RtmpMessage
     return messageHeader;
 };
 
-const readMessageStream = (bytes: ByteArray, chunkData: RtmpChunk) => {
+function readMessageStream(bytes: ByteArray, chunkData: RtmpChunk) {
     const messageHeader = chunkData.messageHeader;
     const messageData = chunkData.messageData || new ByteArray();
 
@@ -91,12 +103,13 @@ const readMessageStream = (bytes: ByteArray, chunkData: RtmpChunk) => {
     return messageData;
 };
 
-const detectAmfVersion = (messageType: number): AmfVersion =>
-    messageType == RtmpMessageType.CONTROL_AMF3 || messageType == RtmpMessageType.METADATA_AMF3
+function detectAmfVersion(messageType: number): AmfVersion {
+    return messageType == RtmpMessageType.CONTROL_AMF3 || messageType == RtmpMessageType.METADATA_AMF3
         ? AmfVersion.AMF3
         : AmfVersion.AMF0;
+}
 
-const parseMessagePayload = (chunkData: RtmpChunk) => {
+function parseMessagePayload(chunkData: RtmpChunk) {
     const messageHeader = chunkData.messageHeader;
     const payload = chunkData.messageData;
     payload.setPosition(0);
@@ -148,6 +161,7 @@ const parseMessagePayload = (chunkData: RtmpChunk) => {
             // This workaround allows to read such contents but safer to send 0 as objectEncoding on connect
             payload.setObjectEncoding(AmfVersion.AMF0);
             if (detectAmfVersion(messageHeader.type) === AmfVersion.AMF3) {
+                // skip first byte
                 payload.readByte();
             }
 
@@ -161,10 +175,12 @@ const parseMessagePayload = (chunkData: RtmpChunk) => {
     }
 };
 
-export const parseRtmpChunk = (chunk: ByteArray | Uint8Array | ArrayBuffer, offset = 0) => {
+export function parseRtmpChunk(chunk: ByteArray | Uint8Array | ArrayBuffer, offset = 0) {
     let bytes = chunk instanceof ByteArray ? new ByteArray(chunk.getBytes()) : new ByteArray(chunk);
     bytes.setPosition(offset);
     while (bytes.getBytesAvailable()) {
+        console.log("======")
+
         const basicHeader = parseBasicHeader(bytes);
         const chunkData = chunkList[basicHeader.streamId] || {};
         chunkList[basicHeader.streamId] = chunkData;
@@ -192,7 +208,7 @@ export const parseRtmpChunk = (chunk: ByteArray | Uint8Array | ArrayBuffer, offs
                 console.log(e);
                 console.log("error on position " + messageData.getPosition());
             }
-            delete chunkList[basicHeader.streamId];
+            chunkData.messageData = new ByteArray();
         }
     }
 };
